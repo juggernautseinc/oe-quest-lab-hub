@@ -1,0 +1,27 @@
+{
+    "name": "juggernautsei/oe-quest-lab-hub",
+    "description": "Connect to send lab orders to Quest",
+    "type": "openemr-module",
+    "minimum-stability": "stable",
+    "license": "proprietary",
+    "authors": [
+        {
+            "name": "Sherwin Gaddis",
+            "email": "sheriwngaddis@gmail.com"
+        }
+    ],
+    "keywords": ["openemr", "openemr-module"],
+    "autoload": {
+        "psr-4": {"Juggernaut\\Quest\\Module\\": "src/"}
+    },
+    "require": {
+        "openemr/oe-module-installer-plugin": "^0.1.0",
+        "php": ">= 7.4",
+        "symfony/event-dispatcher": "^4.4.0",
+        "nyholm/psr7": "^1.4",
+      "ext-curl": "*"
+    },
+    "conflict": {
+        "openemr/openemr": "<7.0.0"
+    }
+}
