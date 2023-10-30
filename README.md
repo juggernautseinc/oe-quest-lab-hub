@@ -12,18 +12,24 @@ PDF results will be retrieved manually through the Quest user portal.
 The use of this module does require that Quest is contacted before enabling this module. Quest will
 contact our office to schedule the turn-up of this module.
 
-#Installation
+# Installation
+
 Using composer:
 Contact us for a access token.
 Open composer.json in your project and add the following 
 
-  {
-    "config": {
-        "github-oauth": {
-            "github.com": "YOUR_GITHUB_TOKEN"
+    {
+        "require": {
+            "juggernautseinc/oe-quest-lab-hub": "dev-main"
+        },
+        "config": {
+            "github-oauth": {
+                "github.com": "YOUR_GITHUB_TOKEN"
+            }
         }
     }
-    }
+
+
 
 
 
