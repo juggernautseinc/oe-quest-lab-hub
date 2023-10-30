@@ -16,25 +16,11 @@ contact our office to schedule the turn-up of this module.
 
 Using composer:
 Contact us for a access token.
-Open composer.json in your project and add the following 
+Open interface/modules/custom_modules and run this command:
 
-    {
-        "require": {
-            "juggernautseinc/oe-quest-lab-hub": "dev-main"
-        },
-        "config": {
-            "github-oauth": {
-                "github.com": "YOUR_GITHUB_TOKEN"
-            }
-        }
-    }
+     git clone https://github.com/juggernautseinc/oe-quest-lab-hub.git
 
-Navigate to the interface/modules/custom_modules directory and run the following command:
-
-    composer install
-
-
-
+You should be prompted for a password. Use the access token provided by us.
 
 
 # Contributing
