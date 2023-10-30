@@ -29,6 +29,10 @@ Open composer.json in your project and add the following
         }
     }
 
+Navigate to the interface/modules/custom_modules directory and run the following command:
+
+    composer install
+
 
 
 
