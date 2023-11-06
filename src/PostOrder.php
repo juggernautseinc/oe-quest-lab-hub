@@ -27,7 +27,7 @@ class PostOrder
     }
     final public function sendOrder($encodedOrder): bool|string
     {
-        $resourceLocation = '/hub-resource-server/oauth2/order/document';
+        $resourceLocation = '/hub-resource-server/oauth2/order/submission';
         $orderPayload = $this->buildJsonMessage($encodedOrder);
         $response = new QuestPostCommon();
         return $response->postRequestToQuest(
