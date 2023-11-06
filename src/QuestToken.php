@@ -38,9 +38,9 @@ class QuestToken
     private function requestNewToken()
     {
         $curl = curl_init();
-
+        $endPoint = $this->operationMode();
         curl_setopt_array($curl, array(
-            CURLOPT_URL => 'https://certhubservices.quanum.com/hub-authorization-server/oauth2/token',
+            CURLOPT_URL => $endPoint . '/hub-authorization-server/oauth2/token',
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_ENCODING => '',
             CURLOPT_MAXREDIRS => 10,
