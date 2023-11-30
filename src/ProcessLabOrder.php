@@ -21,5 +21,6 @@ class ProcessLabOrder
         $encodedOrder = base64_encode($orderHl7);
         //transmit the order
         $this->orderHl7 = $hl7Order->sendOrder($encodedOrder);
+        return $this->orderHl7;
     }
 }
