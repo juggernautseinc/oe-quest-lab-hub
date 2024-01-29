@@ -73,7 +73,6 @@ namespace Juggernaut\Quest\Module;
 
         public function getGlobalSetting($settingKey)
         {
-            global $GLOBALS;
             // don't like this as php 8.1 requires this but OpenEMR works with globals and this is annoying.
             return $GLOBALS[$settingKey] ?? null;
         }

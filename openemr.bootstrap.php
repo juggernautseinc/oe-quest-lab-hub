@@ -19,7 +19,7 @@ namespace Juggernaut\Quest\Module;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 require_once dirname(__DIR__) . "/oe-quest-lab-hub/vendor/autoload.php";
-//require_once "src/bootstrap.php";
+
     /**
      * @global EventDispatcherInterface $eventDispatcher Injected by the OpenEMR module loader;
      */

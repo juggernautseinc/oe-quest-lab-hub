@@ -9,8 +9,8 @@
  *
  */
 
-use Juggernaut\Quest\Module\GetHL7Results;
-use Juggernaut\Quest\Module\ParseHl7Results;
+namespace Juggernaut\Quest\Module;
+
 function getResults(): void
 {
     $manualResults = false; //I have no idea what I was thinking here.

@@ -21,7 +21,7 @@
     use OpenEMR\Core\Kernel;
     use OpenEMR\Events\Encounter\EncounterButtonEvent;
     use OpenEMR\Events\Globals\GlobalsInitializedEvent;
-    use OpenEMR\Events\Services\LabTransmitEvent;
+    use OpenEMR\Events\Services\QuestLabTransmitEvent;
     use OpenEMR\Services\Globals\GlobalSetting;
     use OpenEMR\Menu\MenuEvent;
     use Symfony\Component\EventDispatcher\EventDispatcherInterface;
@@ -57,7 +57,6 @@
 
         public function __construct(EventDispatcherInterface $eventDispatcher)
         {
-            global $GLOBALS;
 
             if (empty($kernel)) {
                 $kernel = new Kernel();
@@ -89,8 +88,8 @@
 
         public function subscribeToLabTransmissionEvents(): void
         {
-            $this->eventDispatcher->addListener(LabTransmitEvent::EVENT_LAB_TRANSMIT, [$this, 'sendOrderToQuestLab']);
-            $this->eventDispatcher->addListener(LabTransmitEvent::EVENT_LAB_POST_ORDER_LOAD, [$this, 'downloadPdfToDesktop']);
+            $this->eventDispatcher->addListener(QuestLabTransmitEvent::EVENT_LAB_TRANSMIT, [$this, 'sendOrderToQuestLab']);
+            $this->eventDispatcher->addListener(QuestLabTransmitEvent::EVENT_LAB_POST_ORDER_LOAD, [$this, 'downloadPdfToDesktop']);
         }
 
         public function subscribeToEncounterFormEvents(): void
@@ -104,12 +103,16 @@
             $event->setButton($addButtonEncounterForm->specimenLabelButton());
         }
 
-        public function sendOrderToQuestLab(LabTransmitEvent $event): void
+        public function sendOrderToQuestLab(QuestLabTransmitEvent $event): void
         {
             $order = $event->getOrder(); // get the order from the event
             $requisitionOrder = $order;
-            new ProcessLabOrder($order); // create a new process lab order
-
+            $result = new ProcessLabOrder($order); // create a new process lab order We might want to return errors here
+            //This logging is for debugging purposes
+//            if ($result) {
+//                $location = dirname(__DIR__, 5) . "/sites/" . $_SESSION['site_id'] . "/documents/labs/";
+//                file_put_contents($location . 'labOrderResult.txt', print_r($result, true) .PHP_EOL, FILE_APPEND);
+//            }
             //call to get the requisition document from QuestLab
             if ($GLOBALS['oe_quest_download_requisition']) { // the requisition form is optional and can be turned off
                 $pdf = new ProcessRequisitionDocument($requisitionOrder);
@@ -141,7 +144,7 @@
 
         public function addGlobalQuestSettingsSection(GlobalsInitializedEvent $event): void
         {
-            global $GLOBALS;
+
             $service = $event->getGlobalsService();
             $section = xlt("Quest Lab");
             $service->createSection($section, 'Portal');

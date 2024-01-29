@@ -35,7 +35,7 @@ $token = new QuestToken();
         $accessToken = json_decode($token->getFreshToken(), true);
         if (isset($accessToken['token_type']) && isset($accessToken['access_token'])) {
             echo "The configuration is completed successful and token retrieved successfully.";
-            //echo $accessToken['access_token'];
+             
         } else {
             echo "The configuration is incomplete. Check your username and password are in the system.";
         }

@@ -44,7 +44,7 @@ class QuestPostCommon
             error_log(" Quest Lab Order:Debug payload " . $payload);
         }
         $response = curl_exec($curl);
-        $status = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        $status = curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
 
         curl_close($curl);
         if ($status == 200) {

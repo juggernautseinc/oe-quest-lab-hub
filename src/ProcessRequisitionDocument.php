@@ -36,13 +36,16 @@ class ProcessRequisitionDocument
     public function sendRequest(): string
     {
         $token = new QuestToken();
+        $mode = $token->operationMode();
+        error_log("Requisition document: " . $mode);
         $postToken = json_decode($token->getFreshToken(), true);
+        $postToken = $postToken['access_token'] ?? '';
         $requestPayload = $this->buildRequest();
 
         $curl = curl_init();
 
         curl_setopt_array($curl, array(
-            CURLOPT_URL => Bootstrap::HUB_RESOURCE_TESTING_URL . '/hub-resource-server/oauth2/order/document',
+            CURLOPT_URL => $mode . '/hub-resource-server/oauth2/order/document',
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_ENCODING => '',
             CURLOPT_MAXREDIRS => 10,
@@ -52,7 +55,7 @@ class ProcessRequisitionDocument
             CURLOPT_CUSTOMREQUEST => 'POST',
             CURLOPT_POSTFIELDS => $requestPayload,
             CURLOPT_HTTPHEADER => array(
-                "Authorization: Bearer " . $postToken['access_token'],
+                "Authorization: Bearer " . $postToken,
                 'Content-Type: application/json',
             ),
         ));
@@ -60,11 +63,12 @@ class ProcessRequisitionDocument
         $response = curl_exec($curl);
         $info = curl_getinfo($curl, CURLINFO_HTTP_CODE);
         if (!curl_errno($curl)) {
-            $code = $info['http_code'];
+            $code = $info['http_code'] ?? '';
             error_log("Requisition document: returned successfully $code");
             curl_close($curl);
             $responsePdf = json_decode($response, true);
-            $pdfDecoded = base64_decode($responsePdf['orderSupportDocuments'][0]['documentData']); //This is not a base64 encoded string
+            $returnedPdfDocument = $responsePdf['orderSupportDocuments'][0]['documentData'] ?? '';
+            $pdfDecoded = base64_decode($returnedPdfDocument); //This is not a base64 encoded string
             $path = Bootstrap::requisitionFormPath();
             $reqName = 'labRequisition-' . time() . '.pdf';
             $directory = new DirectoryCheckCreate();
