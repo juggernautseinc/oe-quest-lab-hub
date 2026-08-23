@@ -59,7 +59,11 @@ class SendAcknowledgement
         $acknowledgement = "MSH|^~\&||" . $this->sendingFacId['send_fac_id'] . "|LAB|" .
             $this->receivingFacId['recv_fac_id'] . "|" . $date . "||ACK|" . rand(10000, 999999) . "|T|2.3\r" .
             "MSA|CA|" . $this->messageId['hl7Message']['controlId'];
-        file_put_contents('/var/www/html/quest/ack_hl7.txt', $acknowledgement);
+        // OE_SITE_DIR already includes the site folder (e.g. .../sites/default)
+        $tempDir = rtrim((string) ($GLOBALS['OE_SITE_DIR'] ?? ''), '/') . '/documents/temp/';
+        if ($tempDir !== '/documents/temp/' && (is_dir($tempDir) || mkdir($tempDir, 0755, true) || is_dir($tempDir))) {
+            file_put_contents($tempDir . 'ack_hl7.txt', $acknowledgement);
+        }
         return base64_encode($acknowledgement);
     }
 

@@ -9,7 +9,10 @@
  *
  */
 
-namespace Juggernaut\Quest\Module;
+use Juggernaut\Quest\Module\GetHL7Results;
+use Juggernaut\Quest\Module\ParseHl7Results;
+
+require_once dirname(__DIR__, 4) . '/globals.php';
 
 function getResults(): void
 {
@@ -19,7 +22,7 @@ function getResults(): void
     $hl7ResultsArray = json_decode($hl7Results, true);
 
     if (!$hl7ResultsArray['results']) {
-        $msg = xlt('no results found');
+        $msg = xlt('no results found - Quest Lab Order Get');
         error_log($msg);
     } else {
         $parser = new ParseHl7Results($hl7ResultsArray);

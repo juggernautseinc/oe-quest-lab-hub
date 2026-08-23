@@ -1,0 +1,6 @@
+*.bak
+*.bak_*
+composer.lock
+/.idea/
+/vendor/
+/.vscode/

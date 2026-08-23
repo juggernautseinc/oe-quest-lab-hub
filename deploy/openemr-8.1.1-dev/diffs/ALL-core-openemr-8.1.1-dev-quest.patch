@@ -1,0 +1,290 @@
+--- a/interface/forms/procedure_order/common.php
++++ b/interface/forms/procedure_order/common.php
+@@ -300,7 +300,8 @@
+         if ($diag_flag === 0) {
+             $order_data .= "\n" . xlt("At least one diagnosis is required! Please add a diagnosis for this order.");
+         }
+-        if ($_POST['form_order_abn'] === 'required') {
++        // ABN validation skipped for Quest — Quest generates ABN documents server-side
++        if ($gbl_lab !== 'quest' && $_POST['form_order_abn'] === 'required') {
+             $order_data .= "\n" . xlt("ABN is required but not signed!");
+         }
+         if (!$_POST['form_date_collected'] && !$_POST['form_order_psc']) {
+@@ -419,8 +420,9 @@
+                     }
+                     if ($gbl_lab === 'quest' && $isDorn === false) {
+                         $order_log .= xlt("Transmitting order to Quest");
+-                        $ed->dispatch(new QuestLabTransmitEvent($hl7), QuestLabTransmitEvent::EVENT_LAB_TRANSMIT);
+-                        $ed->dispatch(new QuestLabTransmitEvent($pid), QuestLabTransmitEvent::EVENT_LAB_POST_ORDER_LOAD);
++                        // Pass both HL7/pid and order ID so the module can fetch ABN/REQ/AOE documents
++                        $ed->dispatch(new QuestLabTransmitEvent($hl7, $formid), QuestLabTransmitEvent::EVENT_LAB_TRANSMIT);
++                        $ed->dispatch(new QuestLabTransmitEvent($pid, $formid), QuestLabTransmitEvent::EVENT_LAB_POST_ORDER_LOAD);
+                     }
+ 
+                     if ($_POST['form_order_psc']) {
+--- a/interface/orders/receive_hl7_results.inc.php
++++ b/interface/orders/receive_hl7_results.inc.php
+@@ -990,7 +990,14 @@
+             $context = $a[0];
+             $arep = [];
+             if ($direction != 'R' && $a[2]) {
+-                $in_orderid = intval($a[2]);
++                // Parse order ID - handle both formats: "FACILITY-ORDERID" or just "ORDERID"
++                // Quest returns the padded format: e.g. "STL-0042"
++                $parts = explode('-', (string) $a[2]);
++                if (count($parts) > 1) {
++                    $in_orderid = intval($parts[1]);
++                } else {
++                    $in_orderid = intval($parts[0]);
++                }
+                 $porow = false;
+                 $pcrow = false;
+             }
+--- a/src/Events/Services/QuestLabTransmitEvent.php
++++ b/src/Events/Services/QuestLabTransmitEvent.php
+@@ -26,15 +26,42 @@
+     const EVENT_LAB_POST_ORDER_LOAD = 'lab.post_order_load';
+ 
+     private string $order;
+-    public function __construct($hl7)
++    private ?int $orderId = null;
++
++    /**
++     * Constructor for QuestLabTransmitEvent
++     *
++     * @param string|int $hl7 HL7 order string or patient ID
++     * @param int|null $orderId Optional order ID (procedure_order_id)
++     */
++    public function __construct($hl7, ?int $orderId = null)
+     {
+         if (is_string($hl7)) {
+             $this->order = $hl7;
++        } elseif (is_int($hl7)) {
++            // For backwards compatibility with pid-only events
++            $this->order = (string)$hl7;
+         }
++        $this->orderId = $orderId;
+     }
+ 
++    /**
++     * Get the order HL7 string or patient ID
++     *
++     * @return string
++     */
+     public function getOrder(): string
+     {
+         return $this->order;
+     }
++
++    /**
++     * Get the order ID (procedure_order_id)
++     *
++     * @return int|null
++     */
++    public function getOrderId(): ?int
++    {
++        return $this->orderId;
++    }
+ }
+--- a/interface/procedure_tools/quest/gen_hl7_order.inc.php
++++ b/interface/procedure_tools/quest/gen_hl7_order.inc.php
+@@ -79,6 +79,30 @@
+  * @return Hl7OrderResult  Result object containing HL7 text and optional lab-specific requisition data.
+  * @throws Hl7OrderGenerationException On errors with descriptive message.
+  */
++
++/**
++ * Convert order_abn field to HL7 ORC.20 ABN status code.
++ *
++ * @param string $order_abn The order_abn value from procedure_order table.
++ * @return string HL7 ABN status code for ORC.20 field.
++ */
++function hl7AbnStatus($order_abn): string
++{
++    $abn_status = trim(strtolower((string) $order_abn));
++
++    // Map order_abn values to HL7 ORC.20 codes per Quest documentation:
++    // 2 = Notified & Signed (ABN signed by patient)
++    // 4 = Unsigned (ABN required but not signed)
++    // Empty = Not required
++    if ($abn_status === 'signed') {
++        return '2';
++    } elseif ($abn_status === 'required') {
++        return '4';
++    }
++
++    return '';
++}
++
+ function quest_gen_hl7_order(int $orderid): Hl7OrderResult
+ {
+     $labSample = '';
+@@ -124,13 +148,17 @@
+         [$orderid]
+     );
+ 
++    $psc = '';
++    if (($porow['order_psc'] ?? null) == '1') {
++        $psc = 'PSC';
++    }
+     $padOrderId = trim((string) $porow['send_fac_id']) . "-" . trim(str_pad((string)$orderid, 4, "0", STR_PAD_LEFT));
+   // Message Header
+     $out .= "MSH" .
+     $d1 . "$d2~\\&" .               // Encoding Characters (delimiters)
+     $d1 . $porow['send_app_id'] .   // Sending Application ID
+     $d1 . $porow['send_fac_id'] .   // Sending Facility ID
+-    $d1 . $porow['recv_app_id'] .   // Receiving Application ID
++    $d1 . ($psc !== '' ? $psc : $porow['recv_app_id']) .   // Receiving Application ID (PSC for Patient Service Center hold)
+     $d1 . $porow['recv_fac_id'] .   // Receiving Facility ID
+     $d1 . date('YmdHis', $today) .  // Date and time of this message
+     $d1 .
+@@ -279,41 +307,59 @@
+             $d1 . hl7SSN($porow['ss'], withDashes: true) .
+             $d0;
+     }
+-  // Common Order.
+-    $out .= "ORC" .
+-    $d1 . "NW" .                     // New Order
+-    $d1 . $padOrderId . // Placer Order Number
+-    str_repeat($d1, 6) .             // ORC 3-8 not used
+-    $d1 . date('YmdHis') .           // Transaction date/time
+-    $d1 . $d1 .
+-    $d1 . hl7Text($porow['docnpi']) .     // Ordering Provider
+-      $d2 . hl7Text($porow['doclname']) . // Last Name
+-      $d2 . hl7Text($porow['docfname']) . // First Name
+-    str_repeat($d1, 7) .             // ORC 13-19 not used
+-    $d1 . "2" .                      // ABN Status: 2 = Notified & Signed, 4 = Unsigned
+-    $d0;
+-
+     $setid = 0;
+     while ($pcrow = sqlFetchArray($pcres)) {
++        // Common Order — Quest requires ORC inside the loop (one per procedure)
++        $out .= "ORC" .
++            $d1 . "NW" .                     // New Order
++            $d1 . $padOrderId .              // Placer Order Number
++            str_repeat($d1, 6) .             // ORC 3-8 not used
++            $d1 . date('YmdHis') .           // Transaction date/time
++            $d1 . $d1 .
++            $d1 . hl7Text($porow['docnpi']) .          // Ordering Provider
++            $d2 . hl7Text($porow['doclname']) .        // Last Name
++            $d2 . hl7Text($porow['docfname']) . '^^^^^^NPI' . // First Name + qualifier
++            str_repeat($d1, 7) .             // ORC 13-19 not used
++            $d1 . hl7AbnStatus($porow['order_abn'] ?? '') .  // ABN Status: dynamic from order
++            $d0;
++
+         // Observation Request.
+         $out .= "OBR" .
+-        $d1 . ++$setid . // Set ID
+-        $d1 . $padOrderId . // Placer Order Number
+-        $d1 .
+-        $d1 . '^^^' . hl7Text($pcrow['procedure_code']) .
+-        $d2 . hl7Text($pcrow['procedure_name']) .
+-        $d1 . hl7Priority($porow['order_priority']) . // S=Stat, R=Routine
+-        $d1 .
+-        $d1 . hl7Time($porow['date_collected'], withSeconds: true) .     // Observation Date/Time
+-        str_repeat($d1, 8) .                  // OBR 8-15 not used
+-        $d1 . hl7Text($porow['docnpi']) .             // Physician ID
+-        $d2 . hl7Text($porow['doclname']) .         // Last Name
+-        $d2 . hl7Text($porow['docfname']) .         // First Name
+-        $d1 .
+-        $d1 . (count($payers) ? 'I' : 'P') .          // I=Insurance, C=Client, P=Self Pay
+-        str_repeat($d1, 8) .                          // OBR 19-26 not used
+-        $d1 . '0' .                                   // ?
+-        $d0;
++            $d1 . ++$setid .                            // Set ID
++            $d1 . $padOrderId .                         // Placer Order Number
++            $d1 .
++            $d1 . '^^^' . hl7Text($pcrow['procedure_code']) .
++            $d2 . hl7Text($pcrow['procedure_name']) .
++            $d1 . hl7Priority($porow['order_priority']) . // S=Stat, R=Routine
++            $d1 .
++            $d1 . hl7Time($porow['date_collected'], withSeconds: true) .   // Observation Date/Time
++            str_repeat($d1, 8) .                        // OBR 8-15 not used
++            $d1 . hl7Text($porow['docnpi']) .           // Physician ID
++            $d2 . hl7Text($porow['doclname']) .         // Last Name
++            $d2 . hl7Text($porow['docfname']) . '^^^^^^NPI' . // First Name + qualifier
++            $d1 .
++            $d1 . (count($payers) ? 'I' : 'P') .       // I=Insurance, C=Client, P=Self Pay
++            str_repeat($d1, 8) .                        // OBR 19-26 not used
++            $d1 . '0' .                                 // ?
++            $d0;
++
++        // NTE segments for per-order clinical notes to the lab
++        $nte_setid = 0;
++        if (!empty($porow['patient_instructions'])) {
++            $out .= "NTE" .
++                $d1 . ++$nte_setid .
++                $d1 . "I" .
++                $d1 . hl7Text($porow['patient_instructions']) .
++                $d0;
++        }
++
++        if (!empty($porow['clinical_hx'])) {
++            $out .= "NTE" .
++                $d1 . ++$nte_setid .
++                $d1 . "I" .
++                $d1 . hl7Text($porow['clinical_hx']) .
++                $d0;
++        }
+ 
+         // Diagnoses.  Currently hard-coded for ICD10 and we'll surely want to make
+         // this more flexible (probably when some lab needs another diagnosis type).
+@@ -346,9 +392,12 @@
+         }
+ 
+         // Order entry questions and answers.
++        // Quest AOE OBX-3 must be: ^^^<AOE analytic id>^<question text>
++        // In procedure_questions the analytic id is stored in `seq` (from AOE file field 4),
++        // while `question_code` is the internal/AOE key (not what Quest expects in OBX-3).
+         $qres = sqlStatement(
+             "SELECT " .
+-            "a.question_code, a.answer, q.fldtype " .
++            "a.question_code, a.answer, q.fldtype, q.seq, q.question_text " .
+             "FROM procedure_answers AS a " .
+             "LEFT JOIN procedure_questions AS q ON " .
+             "q.lab_id = ? " .
+@@ -377,31 +426,27 @@
+                   $answer = $weeks . 'wks ' . $days . 'days';
+             }
+ 
++              // Prefer Quest analytic id from seq; fall back to question_code if seq empty.
++              $aoeId = trim((string) ($qrow['seq'] ?? ''));
++              if ($aoeId === '' || $aoeId === '0') {
++                  $aoeId = trim((string) ($qrow['question_code'] ?? ''));
++              }
++              $aoeText = trim((string) ($qrow['question_text'] ?? ''));
++              // OBX-3: ^^^analyticId^questionText  (e.g. ^^^75400658^SOURCE)
++              $obx3 = '^^^' . hl7Text($aoeId);
++              if ($aoeText !== '') {
++                  $obx3 .= '^' . hl7Text($aoeText);
++              }
++
+               $out .= "OBX" .
+                 $d1 . ++$setid2 .                           // Set ID
+                 $d1 . $datatype .                           // Structure of observation value
+-                $d1 . hl7Text($qrow['question_code']) .     // Clinical question code
++                $d1 . $obx3 .                               // Quest AOE identifier
+                 $d1 .
+                 $d1 . hl7Text($answer) .                    // Clinical question answer
+                 $d0;
+         }
+     }
+-        //recreate OBX here to add to end of hl7
+-        $out .= "OBX" .
+-            $d1 . "1" .
+-            $d1 . "ST" .
+-            $d1 . "PR101^CLINICAL INFORMATION" .
+-            $d1 .
+-            $d1 . $porow['patient_instructions'] .
+-            $d0;
+-
+-        $out .= "OBX" .
+-            $d1 . "2" .
+-            $d1 . "ST" .
+-            $d1 . "PR300^SPECIMEN SOURCE/SAMPLE TYPE" .
+-            $d1 .
+-            $d1 . $porow['clinical_hx'] .
+-            $d0;
+ 
+     return new Hl7OrderResult($out);
+ }

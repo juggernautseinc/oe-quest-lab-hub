@@ -11,6 +11,10 @@
 
 namespace Juggernaut\Quest\Module;
 
+use GuzzleHttp\Client;
+use GuzzleHttp\Exception\GuzzleException;
+use Juggernaut\Quest\Module\Exceptions\QuestHttpException;
+
 class QuestToken
 {
     /**
@@ -35,32 +39,42 @@ class QuestToken
         return $this->requestNewToken();
     }
 
-    private function requestNewToken()
+    private function requestNewToken(): string
     {
-        $curl = curl_init();
-        $endPoint = $this->operationMode();
-        curl_setopt_array($curl, array(
-            CURLOPT_URL => $endPoint . '/hub-authorization-server/oauth2/token',
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_ENCODING => '',
-            CURLOPT_MAXREDIRS => 10,
-            CURLOPT_TIMEOUT => 0,
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-            CURLOPT_CUSTOMREQUEST => 'POST',
-            CURLOPT_POSTFIELDS => array('grant_type' => 'client_credentials',
-                                        'client_id' => $this->clientId,
-                                        'client_secret' => $this->clientSecret),
-        ));
+        $endPoint      = $this->operationMode();
+        $tokenEndpoint = $endPoint . '/hub-authorization-server/oauth2/token';
 
-        $response = curl_exec($curl);
-        $status = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        try {
+            $client   = new Client();
+            $response = $client->post($tokenEndpoint, [
+                'http_errors'  => false,
+                'form_params'  => [
+                    'grant_type'    => 'client_credentials',
+                    'client_id'     => $this->clientId,
+                    'client_secret' => $this->clientSecret,
+                ],
+            ]);
 
-        curl_close($curl);
-        if ($status == 200) {
-            return $response;
-        } else {
-            return $status;
+            $statusCode = $response->getStatusCode();
+            $body       = $response->getBody()->getContents();
+
+            if ($statusCode === 200) {
+                return $body;
+            }
+
+            error_log('Quest token request failed: HTTP ' . $statusCode . ' — ' . $body);
+            return json_encode([
+                'error'  => 'token_request_failed',
+                'status' => $statusCode,
+                'reason' => 'HTTP ' . $statusCode,
+            ]);
+        } catch (GuzzleException $e) {
+            error_log('Quest token Guzzle error: ' . $e->getMessage());
+            return json_encode([
+                'error'  => 'token_request_failed',
+                'status' => 0,
+                'reason' => $e->getMessage(),
+            ]);
         }
     }
 

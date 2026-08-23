@@ -1,0 +1,18 @@
+--- a/interface/orders/receive_hl7_results.inc.php
++++ b/interface/orders/receive_hl7_results.inc.php
+@@ -990,7 +990,14 @@
+             $context = $a[0];
+             $arep = [];
+             if ($direction != 'R' && $a[2]) {
+-                $in_orderid = intval($a[2]);
++                // Parse order ID - handle both formats: "FACILITY-ORDERID" or just "ORDERID"
++                // Quest returns the padded format: e.g. "STL-0042"
++                $parts = explode('-', (string) $a[2]);
++                if (count($parts) > 1) {
++                    $in_orderid = intval($parts[1]);
++                } else {
++                    $in_orderid = intval($parts[0]);
++                }
+                 $porow = false;
+                 $pcrow = false;
+             }

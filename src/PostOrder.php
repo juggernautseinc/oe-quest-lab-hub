@@ -10,23 +10,59 @@
 
 namespace Juggernaut\Quest\Module;
 
+use Juggernaut\Quest\Module\Exceptions\QuestHttpException;
+use OpenEMR\Common\Logging\SystemLogger;
+
+/**
+ * PostOrder
+ *
+ * Handles posting lab orders to Quest Hub.
+ *
+ * @package Juggernaut\Quest\Module
+ */
 class PostOrder
 {
-    //$orderType can be overwritten because there are different order that can be sent
-    // TODO read string to get order type and set it further up the stream
-    // this is actually set in the requisition form and not in the order form.
-    private function buildJsonMessage($encodedOrder, $orderType = 'REQ'): bool|string
+    /**
+     * System logger
+     * @var SystemLogger
+     */
+    private SystemLogger $logger;
+
+    /**
+     * Constructor
+     */
+    public function __construct()
+    {
+        $this->logger = new SystemLogger();
+    }
+
+    /**
+     * Build the JSON payload for the order
+     *
+     * @param string $encodedOrder Base64-encoded HL7 order
+     * @return string JSON-encoded order payload
+     */
+    private function buildJsonMessage(string $encodedOrder): string
     {
         $payloadArray = [
             'orderHl7' => $encodedOrder,
             'documentTypes' => [
-                $orderType,
+                'ABN', 'REQ', 'AOE'
             ]
         ];
         return json_encode($payloadArray);
     }
-    final public function sendOrder($encodedOrder): bool|string
+
+    /**
+     * Send an order to Quest Hub
+     *
+     * @param string $encodedOrder Base64-encoded HL7 order
+     * @return string Response from Quest Hub
+     * @throws QuestHttpException If the request fails
+     */
+    final public function sendOrder(string $encodedOrder): string
     {
+        $this->logger->debug('Order payload transmission started');
         $resourceLocation = '/hub-resource-server/oauth2/order/document';
         $orderPayload = $this->buildJsonMessage($encodedOrder);
         $response = new QuestPostCommon();

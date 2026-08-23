@@ -4,7 +4,7 @@
  *  package   OpenEMR
  *  link      http://www.open-emr.org
  * author    Sherwin Gaddis <sherwingaddis@gmail.com>
- * Copyright (c)
+ * Copyright (c) 2024. Sherwin Gaddis <sherwingaddis@gmail.com>
  * All rights reserved
  *
  */
@@ -35,7 +35,7 @@ $token = new QuestToken();
         $accessToken = json_decode($token->getFreshToken(), true);
         if (isset($accessToken['token_type']) && isset($accessToken['access_token'])) {
             echo "The configuration is completed successful and token retrieved successfully.";
-             
+
         } else {
             echo "The configuration is incomplete. Check your username and password are in the system.";
         }

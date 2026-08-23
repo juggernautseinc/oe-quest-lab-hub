@@ -1,0 +1,24 @@
+--- a/interface/forms/procedure_order/common.php
++++ b/interface/forms/procedure_order/common.php
+@@ -300,7 +300,8 @@
+         if ($diag_flag === 0) {
+             $order_data .= "\n" . xlt("At least one diagnosis is required! Please add a diagnosis for this order.");
+         }
+-        if ($_POST['form_order_abn'] === 'required') {
++        // ABN validation skipped for Quest — Quest generates ABN documents server-side
++        if ($gbl_lab !== 'quest' && $_POST['form_order_abn'] === 'required') {
+             $order_data .= "\n" . xlt("ABN is required but not signed!");
+         }
+         if (!$_POST['form_date_collected'] && !$_POST['form_order_psc']) {
+@@ -419,8 +420,9 @@
+                     }
+                     if ($gbl_lab === 'quest' && $isDorn === false) {
+                         $order_log .= xlt("Transmitting order to Quest");
+-                        $ed->dispatch(new QuestLabTransmitEvent($hl7), QuestLabTransmitEvent::EVENT_LAB_TRANSMIT);
+-                        $ed->dispatch(new QuestLabTransmitEvent($pid), QuestLabTransmitEvent::EVENT_LAB_POST_ORDER_LOAD);
++                        // Pass both HL7/pid and order ID so the module can fetch ABN/REQ/AOE documents
++                        $ed->dispatch(new QuestLabTransmitEvent($hl7, $formid), QuestLabTransmitEvent::EVENT_LAB_TRANSMIT);
++                        $ed->dispatch(new QuestLabTransmitEvent($pid, $formid), QuestLabTransmitEvent::EVENT_LAB_POST_ORDER_LOAD);
+                     }
+ 
+                     if ($_POST['form_order_psc']) {

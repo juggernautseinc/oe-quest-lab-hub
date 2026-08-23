@@ -22,6 +22,7 @@ class QuestPostCommon
         $postToken = json_decode($token->getFreshToken(), true);
         $postToken = $postToken['access_token'] ?? '';
         $mode = $token->operationMode() ?? '';
+
         $curl = curl_init();
         if (!empty($mode) && !empty($resourceLocation) && !empty($payload)) {
             curl_setopt_array($curl, array(
@@ -40,7 +41,7 @@ class QuestPostCommon
                 ),
             ));
         } else {
-            error_log(" Quest Lab Order:Debug location" . $mode . $resourceLocation);
+            error_log(" Quest Lab Order:Debug location " . $mode . $resourceLocation);
             error_log(" Quest Lab Order:Debug payload " . $payload);
         }
         $response = curl_exec($curl);
@@ -48,11 +49,9 @@ class QuestPostCommon
 
         curl_close($curl);
         if ($status == 200) {
-            curl_close($curl);
             return $response;
         } else {
-            curl_close($curl);
-            return $status;
+            return "HTTP Status Code: " . $status;
         }
     }
 }

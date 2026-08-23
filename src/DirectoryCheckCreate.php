@@ -23,7 +23,11 @@ class DirectoryCheckCreate
     }
     public function doesDirectoryExist(): bool
     {
-        $this->location = dirname(__FILE__, 6) . "/sites/" . $_SESSION['site_id'] . "/documents/labs";
+        $siteDir = $GLOBALS['OE_SITE_DIR'] ?? '';
+        if ($siteDir === '') {
+            throw new \RuntimeException('OpenEMR site directory (OE_SITE_DIR) is not available.');
+        }
+        $this->location = rtrim($siteDir, '/') . '/documents/labs';
         return file_exists($this->location);
     }
     public function directoryStatus()
