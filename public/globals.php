@@ -13,19 +13,12 @@
 
     // we want to have access to events, the autoloader and our module bootstrap so we include globals here
     require_once dirname(__FILE__, 5) ."/globals.php";
-    use Juggernaut\Quest\Module\Bootstrap;
-
-    // Note we have to grab the event dispatcher from the globals kernel which is instantiated in globals.php
-    $bootstrap = new Bootstrap($GLOBALS['kernel']->getEventDispatcher());
-    $globalsConfig = $bootstrap->getGlobalConfig();
 
 ?>
 <html>
 <body>
-<ul>
-    <li>Option 1 value: <?php echo $globalsConfig->getTextOption(); ?></li>
-    <li>Encrypted value: <?php echo $globalsConfig->getEncryptedOption(); ?></li>
-</ul>
+<p><?php echo xlt('Manage Quest settings through the administrator configuration page. Credentials are not displayed here.'); ?></p>
+<a href="<?php echo attr($GLOBALS['webroot'] . '/interface/super/edit_globals.php'); ?>"><?php echo xlt('Config Settings'); ?></a>
 <a href="index.php">Back to index</a>
 </body>
 </html>

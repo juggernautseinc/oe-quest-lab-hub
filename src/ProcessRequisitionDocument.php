@@ -254,15 +254,7 @@ class ProcessRequisitionDocument
 
             // Determine filename based on document type
             $this->path = Bootstrap::requisitionFormPath();
-            $timestamp = time();
-            $this->reqName = $this->generateFilename($documentType, $timestamp);
-            $pdfPath = $this->path . $this->reqName;
-
-            if (file_put_contents($pdfPath, $pdfBinary) === false) {
-                throw new QuestFileSystemException(
-                    'Failed to write PDF file to: ' . $pdfPath
-                );
-            }
+            $this->reqName = RequisitionFile::save($this->path, $documentType, $pdfBinary);
 
             $this->logger->info('Document PDF saved successfully', [
                 'file' => $this->reqName,
@@ -321,30 +313,4 @@ class ProcessRequisitionDocument
         }
     }
 
-    /**
-     * Generate appropriate filename based on document type
-     *
-     * @param string $documentType The type of document returned (ABN, REQ, ABN-REQ, etc.)
-     * @param int $timestamp Unix timestamp for unique file naming
-     * @return string Generated filename
-     */
-    private function generateFilename(string $documentType, int $timestamp): string
-    {
-        $docType = strtoupper(trim($documentType));
-        
-        // Map document types to descriptive filenames
-        if (str_contains($docType, 'ABN-REQ') || str_contains($docType, 'ABN') && str_contains($docType, 'REQ')) {
-            // Combined ABN and Requisition
-            return "labABN-Requisition-{$timestamp}.pdf";
-        } elseif (str_contains($docType, 'ABN')) {
-            // ABN only
-            return "labABN-{$timestamp}.pdf";
-        } elseif (str_contains($docType, 'AOE')) {
-            // AOE document (may include requisition)
-            return "labAOE-Requisition-{$timestamp}.pdf";
-        } else {
-            // Default to requisition
-            return "labRequisition-{$timestamp}.pdf";
-        }
-    }
 }

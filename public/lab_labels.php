@@ -21,7 +21,12 @@
 
 require_once dirname(__FILE__, 5) . "/globals.php";
 
-$count = $_GET['count'];
+try {
+    $count = \Juggernaut\Quest\Module\LabelCount::parse($_GET['count'] ?? null);
+} catch (\InvalidArgumentException $e) {
+    http_response_code(400);
+    exit('Label count must be an integer from 1 to 300.');
+}
 # This is based on session array.
 $pid_list = array();
 $pid_list = $_SESSION['pidList'];

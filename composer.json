@@ -21,6 +21,9 @@
         "nyholm/psr7": "^1.4",
       "ext-curl": "*"
     },
+    "scripts": {
+        "test:output-boundaries": ["@php tests/output-boundaries.php", "@php tests/requisition-producer.php"]
+    },
     "conflict": {
         "openemr/openemr": ">= 7.0.2"
     }
