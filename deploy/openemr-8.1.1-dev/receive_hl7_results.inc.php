@@ -725,6 +725,11 @@ function receive_hl7_results(&$hl7, &$matchreq, $lab_id = 0, $direction = 'B', $
     $rhl7_return['mssgs'] = [];
     $rhl7_return['needmatch'] = false; // indicates if this file is pending a match request
 
+    // Callers must select the procedure provider; a message cannot supply it.
+    if ((int)$lab_id <= 0) {
+        return rhl7LogMsg(xl('Procedure provider is required'), true);
+    }
+
     $rhl7_segnum = 0;
     $obrPerformingOrganization = '';
 
@@ -1151,7 +1156,8 @@ function receive_hl7_results(&$hl7, &$matchreq, $lab_id = 0, $direction = 'B', $
                     }
                 } // end no $porow
             } // end results-only
-            if (empty($porow)) {
+            $load_order = empty($porow);
+            if ($load_order) {
                 $porow = sqlQuery("SELECT * FROM procedure_order WHERE " .
                     "procedure_order_id = ?", [$in_orderid]);
                 // The order must already exist. Currently we do not handle electronic
@@ -1159,7 +1165,15 @@ function receive_hl7_results(&$hl7, &$matchreq, $lab_id = 0, $direction = 'B', $
                 if (empty($porow) && !($dryrun && $direction == 'R')) {
                     return rhl7LogMsg(xl('Procedure order not found') . ": $in_orderid", true);
                 }
+            }
 
+            // Apply to fetched, cached, parent and results-only orders alike,
+            // before control IDs, order codes, reports or documents can change.
+            if (!empty($porow) && (int)$porow['lab_id'] !== (int)$lab_id) {
+                return rhl7LogMsg(xl('Procedure order does not belong to the selected provider'), true);
+            }
+
+            if ($load_order) {
                 if ($in_encounter) {
                     if ($direction != 'R' && $porow['encounter_id'] != $in_encounter) {
                         return rhl7LogMsg(xl('Encounter ID') .

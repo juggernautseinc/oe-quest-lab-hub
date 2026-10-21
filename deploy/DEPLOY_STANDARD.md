@@ -133,6 +133,18 @@ OBX|1|ST|^^^75400658^SOURCE||URINE
 
 ### C. Core
 
+This is an optional manual port, not part of the current Practice Stack module
+deployment. Do not copy these files into running core as a module upgrade.
+The result parser now requires the caller to select a positive procedure-provider
+ID and rejects existing orders belonging to a different provider before result
+association or order mutation. All repository polling paths already pass that ID;
+independent callers must do so explicitly (omitting it now fails closed). Both
+the full parser and its individual/combined patch include this boundary. ORIG
+files remain unchanged historical baselines. Bidirectional PID matching policy
+is unchanged; this is not demographic matching or transaction-wide atomicity.
+The optional SFTP paths still require a separate host-key authentication repair
+before they may be considered accepted. Prefer the documented FS path meanwhile.
+
 1. Dry-run `ALL-core-openemr-8.1.1-dev-quest.patch` from OpenEMR root.
 2. Apply; if gen_hl7 fails, install full `gen_hl7_order.inc.php` from this package.
 3. PHP lint the four core files.
