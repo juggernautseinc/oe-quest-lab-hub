@@ -497,7 +497,25 @@ function quest_send_hl7_order($ppid, $out)
         }
 
         // Connect to the server and write the file.
+        $expected_host_key = getenv('QUEST_SFTP_HOST_KEY_' . (int)$pprow['ppid']);
+        if (!is_string($expected_host_key) || trim($expected_host_key) === '') {
+            return xl('SFTP host key is not enrolled for this procedure provider');
+        }
         $sftp = new \phpseclib3\Net\SFTP($remote_host);
+        try {
+            $server_host_key = $sftp->getServerPublicHostKey();
+        } catch (\Throwable $e) {
+            return xl('SFTP host key verification failed');
+        }
+        // phpseclib labels an RSA blob with its negotiated SHA-2 signature name.
+        // Enrollment remains the standard OpenSSH ssh-rsa public-key form.
+        if (is_string($server_host_key)) {
+            $server_host_key = preg_replace('/^rsa-sha2-(256|512) /', 'ssh-rsa ', $server_host_key);
+        }
+        if (!is_string($server_host_key) || $server_host_key === '' ||
+            !hash_equals(trim($expected_host_key), $server_host_key)) {
+            return xl('SFTP host key verification failed');
+        }
         if (!$sftp->login($pprow['login'], $pprow['password'])) {
             return xl('Login to this remote host failed') . ": '$remote_host'";
         }

@@ -12,10 +12,14 @@ use OpenEMR\Common\Csrf\CsrfUtils;
 use OpenEMR\Common\Session\SessionWrapperFactory;
 use OpenEMR\Core\Header;
 
+$sessionAllowWrite = true;
 require_once dirname(__FILE__, 5) . "/globals.php";
 require_once dirname(__FILE__, 2) . '/vendor/autoload.php';
 
 use Juggernaut\Quest\Module\BackgroundServices;
+use Juggernaut\Quest\Module\ManagementAccess;
+
+ManagementAccess::requireAdmin();
 
 $session = SessionWrapperFactory::getInstance()->getActiveSession();
 if (empty($session->get('csrf_private_key', null))) {
@@ -26,7 +30,7 @@ $csrfToken = CsrfUtils::collectCsrfToken($session);
 $backgroundServices = new BackgroundServices();
 
 if (isset($_POST['status'])) {
-    if (!CsrfUtils::verifyCsrfToken($_POST["token"] ?? '', $session)) {
+    if (!is_string($_POST['token'] ?? null) || !CsrfUtils::verifyCsrfToken($_POST['token'], $session)) {
         CsrfUtils::csrfNotVerified();
     }
     $backgroundServices->status = ((int) ($_POST['status'] ?? 0) === 1) ? 1 : 0;

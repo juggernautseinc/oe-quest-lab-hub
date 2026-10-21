@@ -8,6 +8,25 @@ series of API calls to their hub. The Quest Hub will auto-generate a requisition
 form for each order. The requisition feature can be disabled in the config if not desired.
 PDF results will be retrieved manually through the Quest user portal.
 
+## Output-boundary checks
+
+The sample settings page never displays or retrieves the Quest client secret;
+configuration remains in OpenEMR's administrator settings. OAuth still uses the
+encrypted setting normally. Label requests accept canonical decimal counts from
+1 through 300 (up to ten 30-label sheets); the encounter button still prints three.
+Invalid counts receive HTTP 400 before PDF generation.
+
+Requisition PDFs use unique, exclusively created files instead of second-resolution
+names. Returned basenames retain ABN/AOE markers and the `.pdf` extension for both
+the native and headless callers. Existing files are never overwritten on collision.
+
+Run `composer test:output-boundaries`, or run both `php tests/output-boundaries.php`
+and `php tests/requisition-producer.php`. They use synthetic data and inert host/
+transport fixtures; no Quest credentials, database or vendor requests are needed.
+Set `QUEST_TEST_SOURCE` to check an installed source tree without deploying tests
+under the web root. These checks do not certify vendor connectivity or patient-role
+authorization for label printing.
+
 # Getting Started
 The use of this module does require that Quest is contacted before enabling this module. Quest will
 contact our office to schedule the turn-up of this module.

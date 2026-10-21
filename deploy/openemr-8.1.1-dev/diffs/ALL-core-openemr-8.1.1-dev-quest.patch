@@ -20,11 +20,23 @@
 +                        $ed->dispatch(new QuestLabTransmitEvent($hl7, $formid), QuestLabTransmitEvent::EVENT_LAB_TRANSMIT);
 +                        $ed->dispatch(new QuestLabTransmitEvent($pid, $formid), QuestLabTransmitEvent::EVENT_LAB_POST_ORDER_LOAD);
                      }
- 
+
                      if ($_POST['form_order_psc']) {
 --- a/interface/orders/receive_hl7_results.inc.php
 +++ b/interface/orders/receive_hl7_results.inc.php
-@@ -990,7 +990,14 @@
+@@ -725,6 +725,11 @@
+     $rhl7_return['mssgs'] = [];
+     $rhl7_return['needmatch'] = false; // indicates if this file is pending a match request
+
++    // Callers must select the procedure provider; a message cannot supply it.
++    if ((int)$lab_id <= 0) {
++        return rhl7LogMsg(xl('Procedure provider is required'), true);
++    }
++
+     $rhl7_segnum = 0;
+     $obrPerformingOrganization = '';
+
+@@ -990,7 +995,14 @@
              $context = $a[0];
              $arep = [];
              if ($direction != 'R' && $a[2]) {
@@ -40,11 +52,62 @@
                  $porow = false;
                  $pcrow = false;
              }
+@@ -1144,7 +1156,8 @@
+                     }
+                 } // end no $porow
+             } // end results-only
+-            if (empty($porow)) {
++            $load_order = empty($porow);
++            if ($load_order) {
+                 $porow = sqlQuery("SELECT * FROM procedure_order WHERE " .
+                     "procedure_order_id = ?", [$in_orderid]);
+                 // The order must already exist. Currently we do not handle electronic
+@@ -1152,7 +1165,15 @@
+                 if (empty($porow) && !($dryrun && $direction == 'R')) {
+                     return rhl7LogMsg(xl('Procedure order not found') . ": $in_orderid", true);
+                 }
++            }
++
++            // Apply to fetched, cached, parent and results-only orders alike,
++            // before control IDs, order codes, reports or documents can change.
++            if (!empty($porow) && (int)$porow['lab_id'] !== (int)$lab_id) {
++                return rhl7LogMsg(xl('Procedure order does not belong to the selected provider'), true);
++            }
+
++            if ($load_order) {
+                 if ($in_encounter) {
+                     if ($direction != 'R' && $porow['encounter_id'] != $in_encounter) {
+                         return rhl7LogMsg(xl('Encounter ID') .
+@@ -1574,7 +1595,24 @@
+             }
+
+             // Connect to the server and enumerate files to process.
++            $expected_host_key = getenv('QUEST_SFTP_HOST_KEY_' . (int)$pprow['ppid']);
++            if (!is_string($expected_host_key) || trim($expected_host_key) === '') {
++                return xl('SFTP host key is not enrolled for this procedure provider');
++            }
+             $sftp = new SFTP($remote_host, $remote_port);
++            try {
++                $server_host_key = $sftp->getServerPublicHostKey();
++            } catch (\Throwable $e) {
++                return xl('SFTP host key verification failed');
++            }
++            // Normalize the RSA signature label, not the validated host-key blob.
++            if (is_string($server_host_key)) {
++                $server_host_key = preg_replace('/^rsa-sha2-(256|512) /', 'ssh-rsa ', $server_host_key);
++            }
++            if (!is_string($server_host_key) || $server_host_key === '' ||
++                !hash_equals(trim($expected_host_key), $server_host_key)) {
++                return xl('SFTP host key verification failed');
++            }
+             if (!$sftp->login($pprow['login'], $pprow['password'])) {
+                 return xl('Login to remote host') . " '$remote_host' " . xl('failed');
+             }
 --- a/src/Events/Services/QuestLabTransmitEvent.php
 +++ b/src/Events/Services/QuestLabTransmitEvent.php
 @@ -26,15 +26,42 @@
      const EVENT_LAB_POST_ORDER_LOAD = 'lab.post_order_load';
- 
+
      private string $order;
 -    public function __construct($hl7)
 +    private ?int $orderId = null;
@@ -65,7 +128,7 @@
          }
 +        $this->orderId = $orderId;
      }
- 
+
 +    /**
 +     * Get the order HL7 string or patient ID
 +     *
@@ -122,7 +185,7 @@
 @@ -124,13 +148,17 @@
          [$orderid]
      );
- 
+
 +    $psc = '';
 +    if (($porow['order_psc'] ?? null) == '1') {
 +        $psc = 'PSC';
@@ -226,12 +289,12 @@
 +                $d1 . hl7Text($porow['clinical_hx']) .
 +                $d0;
 +        }
- 
+
          // Diagnoses.  Currently hard-coded for ICD10 and we'll surely want to make
          // this more flexible (probably when some lab needs another diagnosis type).
 @@ -346,9 +392,12 @@
          }
- 
+
          // Order entry questions and answers.
 +        // Quest AOE OBX-3 must be: ^^^<AOE analytic id>^<question text>
 +        // In procedure_questions the analytic id is stored in `seq` (from AOE file field 4),
@@ -246,7 +309,7 @@
 @@ -377,31 +426,27 @@
                    $answer = $weeks . 'wks ' . $days . 'days';
              }
- 
+
 +              // Prefer Quest analytic id from seq; fall back to question_code if seq empty.
 +              $aoeId = trim((string) ($qrow['seq'] ?? ''));
 +              if ($aoeId === '' || $aoeId === '0') {
@@ -285,6 +348,32 @@
 -            $d1 .
 -            $d1 . $porow['clinical_hx'] .
 -            $d0;
- 
+
      return new Hl7OrderResult($out);
  }
+@@ -452,7 +497,25 @@
+         }
+
+         // Connect to the server and write the file.
++        $expected_host_key = getenv('QUEST_SFTP_HOST_KEY_' . (int)$pprow['ppid']);
++        if (!is_string($expected_host_key) || trim($expected_host_key) === '') {
++            return xl('SFTP host key is not enrolled for this procedure provider');
++        }
+         $sftp = new \phpseclib3\Net\SFTP($remote_host);
++        try {
++            $server_host_key = $sftp->getServerPublicHostKey();
++        } catch (\Throwable $e) {
++            return xl('SFTP host key verification failed');
++        }
++        // phpseclib labels an RSA blob with its negotiated SHA-2 signature name.
++        // Enrollment remains the standard OpenSSH ssh-rsa public-key form.
++        if (is_string($server_host_key)) {
++            $server_host_key = preg_replace('/^rsa-sha2-(256|512) /', 'ssh-rsa ', $server_host_key);
++        }
++        if (!is_string($server_host_key) || $server_host_key === '' ||
++            !hash_equals(trim($expected_host_key), $server_host_key)) {
++            return xl('SFTP host key verification failed');
++        }
+         if (!$sftp->login($pprow['login'], $pprow['password'])) {
+             return xl('Login to this remote host failed') . ": '$remote_host'";
+         }

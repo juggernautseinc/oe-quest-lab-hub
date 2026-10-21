@@ -7,11 +7,22 @@
  * Copyright (c) 2024.  Sherwin Gaddis <sherwingaddis@gmail.com>
  */
 
+$sessionAllowWrite = true;
 require_once dirname(__DIR__, 4) . '/globals.php';
 
 use OpenEMR\Core\Header;
 use Juggernaut\Quest\Module\LoadCompendium;
 use Juggernaut\Quest\Module\Exceptions\QuestConfigException;
+use Juggernaut\Quest\Module\ManagementAccess;
+use OpenEMR\Common\Csrf\CsrfUtils;
+use OpenEMR\Common\Session\SessionWrapperFactory;
+
+ManagementAccess::requireAdmin();
+$session = SessionWrapperFactory::getInstance()->getActiveSession();
+if (empty($session->get('csrf_private_key', null))) {
+    CsrfUtils::setupCsrfKey($session);
+}
+$csrfToken = CsrfUtils::collectCsrfToken($session);
 
 try {
     $requestCompendium = new LoadCompendium();
@@ -138,6 +149,7 @@ try {
         $('#getCompendiumFile').click(function() {
             $('.loader').show();
             const data = {
+                token:       <?php echo json_encode($csrfToken); ?>,
                 fileName:    '<?php echo attr($compendiumFileName); ?>',
                 retrieveURI: '<?php echo attr($resourceLocation); ?>',
                 ackURI:      '<?php echo attr($ackLocation); ?>'

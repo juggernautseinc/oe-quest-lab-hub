@@ -14,6 +14,9 @@ require_once dirname(__FILE__, 2) . "/vendor/autoload.php";
 
 use Juggernaut\Quest\Module\QuestToken;
 use OpenEMR\Core\Header;
+use Juggernaut\Quest\Module\ManagementAccess;
+
+ManagementAccess::requireAdmin();
 
 $token = new QuestToken();
 ?>

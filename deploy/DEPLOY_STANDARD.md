@@ -133,6 +133,44 @@ OBX|1|ST|^^^75400658^SOURCE||URINE
 
 ### C. Core
 
+This is an optional manual port, not part of the current Practice Stack module
+deployment. Do not copy these files into running core as a module upgrade.
+The result parser now requires the caller to select a positive procedure-provider
+ID and rejects existing orders belonging to a different provider before result
+association or order mutation. All repository polling paths already pass that ID;
+independent callers must do so explicitly (omitting it now fails closed). Both
+the full parser and its individual/combined patch include this boundary. ORIG
+files remain unchanged historical baselines. Bidirectional PID matching policy
+is unchanged; this is not demographic matching or transaction-wide atomicity.
+Optional SFTP now requires independently enrolled server keys before credentials
+can be sent. Provision `QUEST_SFTP_HOST_KEY_<ppid>` in the actual PHP worker and
+background/cron environment, using the selected procedure provider's numeric
+database ID (for example `QUEST_SFTP_HOST_KEY_42`). The value is exactly the
+OpenSSH public host key `algorithm base64`, **not** a private key, fingerprint,
+known_hosts line or trailing comment. Obtain it from the laboratory's authenticated
+support channel or administrator; never enroll a key automatically from the
+connection being checked. These public keys are not login secrets, but their
+integrity matters: only deployment administrators may change them.
+
+Missing, whitespace-only, mismatched, invalid-signature or failing handshakes
+return an error before login/transfer. Key rotation or negotiated algorithm
+changes require independently verifying and replacing the enrolled key, not
+disabling verification. No key, password or handshake payload is logged by this
+check. phpseclib3 supports `getServerPublicHostKey()` before authentication:
+https://phpseclib.com/docs/3.0/ssh2/connect . Both full files and02/04/ALL patches
+include the check. Existing inbound `host:port` support and outbound default port22
+are unchanged. FS/download/SOAP modes do not require these SFTP variables.
+For RSA, enroll standard `ssh-rsa base64`; the code normalizes phpseclib's
+negotiated `rsa-sha2-256`/`rsa-sha2-512` signature labels to that key type without
+changing or weakening the validated public-key blob comparison.
+
+Environment pins are per PHP process and provider ID. Sites using the same ID
+with different server keys must use separate worker environments; do not share
+one pin across incompatible site/provider assignments. Ensure FPM/Apache and
+cron receive the same enrollment; setting a shell variable alone may not do so.
+The current Practice Stack does not install these optional core files or enroll
+live vendor keys; source repair is not a claim of live SFTP certification.
+
 1. Dry-run `ALL-core-openemr-8.1.1-dev-quest.patch` from OpenEMR root.
 2. Apply; if gen_hl7 fails, install full `gen_hl7_order.inc.php` from this package.
 3. PHP lint the four core files.

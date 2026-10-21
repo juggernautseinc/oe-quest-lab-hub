@@ -10,11 +10,23 @@
 require_once dirname(__DIR__, 4) . '/globals.php';
 
 use Juggernaut\Quest\Module\QuestGetCommon;
+use Juggernaut\Quest\Module\ManagementAccess;
+use OpenEMR\Common\Csrf\CsrfUtils;
+use OpenEMR\Common\Session\SessionWrapperFactory;
 
 header('Content-Type: application/json');
+ManagementAccess::requireAdmin(true);
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     echo json_encode(['success' => false, 'message' => 'Invalid request method.']);
+    exit;
+}
+
+$session = SessionWrapperFactory::getInstance()->getActiveSession();
+if (empty($session->get('csrf_private_key', null)) || !is_string($_POST['token'] ?? null)
+    || !CsrfUtils::verifyCsrfToken($_POST['token'], $session)) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => xlt('CSRF verification failed.')]);
     exit;
 }
 
