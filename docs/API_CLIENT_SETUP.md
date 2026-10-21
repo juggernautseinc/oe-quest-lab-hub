@@ -77,10 +77,10 @@ Save the response — you cannot retrieve the `client_secret` later:
 
 ```json
 {
-  "client_id": "LnjqojEEjFYe5j2Jp9m9UnmuxOnMg4VodEJj3yE8_OA",
-  "client_secret": "j21ecvLmFi9HPc_Hv0t7Ptmf1pVcZQLtHjIdU7U9tkS9WAjFJwVM...",
-  "registration_access_token": "uiDSXx2GNSvYy5n8eW50aGrJz0HjaGpUdrGf07Agv_Q",
-  "registration_client_uri": "https://your-host/oauth2/default/client/...",
+  "client_id": "YOUR_CLIENT_ID",
+  "client_secret": "YOUR_CLIENT_SECRET",
+  "registration_access_token": "YOUR_REGISTRATION_ACCESS_TOKEN",
+  "registration_client_uri": "YOUR_REGISTRATION_CLIENT_URI",
   "client_name": "Quest Lab Order Client",
   "scope": "openid offline_access api:oemr api:fhir user/allergy.read"
 }

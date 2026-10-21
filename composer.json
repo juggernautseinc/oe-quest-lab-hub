@@ -22,7 +22,8 @@
       "ext-curl": "*"
     },
     "scripts": {
-        "test:output-boundaries": ["@php tests/output-boundaries.php", "@php tests/requisition-producer.php"]
+        "test:output-boundaries": ["@php tests/output-boundaries.php", "@php tests/requisition-producer.php"],
+        "test:management-boundaries": "@php tests/management-boundaries.php"
     },
     "conflict": {
         "openemr/openemr": ">= 7.0.2"
