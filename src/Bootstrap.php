@@ -22,6 +22,8 @@
     /**
      * Note the below use statements are importing classes from the OpenEMR core codebase
      */
+    use Juggernaut\Quest\Module\Exceptions\QuestFileSystemException;
+    use Juggernaut\Quest\Module\Exceptions\QuestHttpException;
     use OpenEMR\Common\Logging\SystemLogger;
     use OpenEMR\Core\Kernel;
     use OpenEMR\Events\Encounter\EncounterButtonEvent;
@@ -240,6 +242,18 @@
             $event->setButton($addButtonEncounterForm->specimenLabelButton());
         }
 
+        /** The placer order number (ORC-2) of an OpenEMR-generated order message, or null. */
+        public static function placerOrderId(string $hl7): ?int
+        {
+            foreach (preg_split('/\r\n|\r|\n/', $hl7) as $segment) {
+                if (str_starts_with($segment, 'ORC|')) {
+                    $id = explode('|', $segment)[2] ?? '';
+                    return ctype_digit($id) && (int) $id > 0 ? (int) $id : null;
+                }
+            }
+            return null;
+        }
+
         /**
          * Processes and sends a lab order to Quest Diagnostics
          *
@@ -252,9 +266,21 @@
         public function sendOrderToQuestLab(QuestLabTransmitEvent $event): void
         {
             $order = $event->getOrder(); // get the order HL7 from the event
-            $orderId = $event->getOrderId(); // get the order ID from the event
+            // OpenEMR's QuestLabTransmitEvent carries only the HL7 (no getOrderId() in any release);
+            // the order ID is the placer order number in ORC-2.
+            $orderId = method_exists($event, 'getOrderId') ? $event->getOrderId() : self::placerOrderId($order);
             $requisitionOrder = $order;
-            $result = new ProcessLabOrder($order); // create a new process lab order We might want to return errors here
+            try {
+                $result = new ProcessLabOrder($order);
+            } catch (QuestHttpException $e) {
+                // OpenEMR marks the order transmitted before dispatching this event; undo that so
+                // the order does not show as sent when Quest did not accept it.
+                $this->logger->error('Quest did not accept the order', ['order_id' => $orderId, 'status_code' => $e->getStatusCode()]);
+                if (!empty($orderId)) {
+                    sqlStatement('UPDATE procedure_order SET date_transmitted = NULL WHERE procedure_order_id = ?', [$orderId]);
+                }
+                return;
+            }
             //This logging is for debugging purposes
 
             $location = self::requisitionFormPath();
@@ -265,11 +291,17 @@
             }
 
             //call to get the requisition document from QuestLab
-            if ($GLOBALS['oe_quest_download_requisition']) { // the requisition form is optional and can be turned off
+            if ($GLOBALS['oe_quest_download_requisition'] && !empty($orderId)) { // the requisition form is optional and can be turned off
                 // Pass both HL7 and order ID for conditional document requests
                 $pdf = new ProcessRequisitionDocument($requisitionOrder, $orderId);
                 $this->logger->info('Requisition form requested from Quest');
-                $this->requisitionFormName = $pdf->sendRequest(); //send request for requisition
+                try {
+                    $this->requisitionFormName = $pdf->sendRequest(); //send request for requisition
+                } catch (QuestHttpException | QuestFileSystemException $e) {
+                    // The order itself was accepted; only the requisition copy is missing.
+                    $this->logger->error('Quest requisition not saved', ['order_id' => $orderId, 'error' => $e->getMessage()]);
+                    return;
+                }
                 $this->logger->info('Requisition form received, storing in documents table');
 
                 // Store the PDF in the documents table so it is permanently linked
