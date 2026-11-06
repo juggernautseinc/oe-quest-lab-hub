@@ -264,7 +264,9 @@ class HeadlessOrderService
      * @param int $formId
      * @param array $data
      */
-    private function insertOrderCodes(int $formId, array $data): void
+    // Protected so an offline adapter can replace the OpenEMR filesystem dependency
+    // while exercising the actual transmission and timestamp-writing pipeline.
+    protected function insertOrderCodes(int $formId, array $data): void
     {
         // Load the save functions
         require_once dirname(__DIR__, 5) . '/interface/forms/procedure_order/procedure_order_save_functions.php';
@@ -351,7 +353,7 @@ class HeadlessOrderService
      * @return string HL7 message content
      * @throws Hl7OrderGenerationException
      */
-    private function generateHl7(int $formId): string
+    protected function generateHl7(int $formId): string
     {
         // The Quest HL7 generator needs $webserver_root which is set by globals.php
         // (available via the REST dispatcher).
