@@ -65,10 +65,15 @@ class PostOrder
         $this->logger->debug('Order payload transmission started');
         $resourceLocation = '/hub-resource-server/oauth2/order/document';
         $orderPayload = $this->buildJsonMessage($encodedOrder);
-        $response = new QuestPostCommon();
-        return $response->postRequestToQuest(
+        $response = (new QuestPostCommon())->postRequestToQuest(
             $resourceLocation,
             $orderPayload
         );
+        // postRequestToQuest returns the body only for HTTP 200; otherwise a status string.
+        if (!is_string($response) || str_starts_with($response, 'HTTP Status Code: ')) {
+            $status = is_string($response) ? (int) substr($response, strlen('HTTP Status Code: ')) : null;
+            throw new QuestHttpException('Quest Hub did not accept the order', 0, $status ?: null, is_string($response) ? $response : null);
+        }
+        return $response;
     }
 }

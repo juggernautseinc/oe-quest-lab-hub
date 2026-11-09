@@ -26,7 +26,8 @@
         "test:management-boundaries": "@php tests/management-boundaries.php",
         "test:manual-result-boundary": "@php tests/manual-result-boundary.php",
         "test:manual-patch-consistency": "node --test tests/manual-patch-consistency.test.cjs",
-        "test:manual-sftp-boundary": "@php tests/manual-sftp-boundary.php"
+        "test:manual-sftp-boundary": "@php tests/manual-sftp-boundary.php",
+        "test:transmit-and-result-receipts": ["@php tests/transmit-and-result-receipts.php", "@php tests/order-rejection-timestamps.php"]
     },
     "conflict": {
         "openemr/openemr": ">= 7.0.2"
